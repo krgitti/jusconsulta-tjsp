@@ -40,6 +40,9 @@ jobs:
         run: npm ci
 
       - name: Build web app
+        env:
+          VITE_GIST_ID: 2ef280e3330c2e01fc4144a47fb6e8a5
+          VITE_GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: npm run build
 
       - name: Capacitor add android

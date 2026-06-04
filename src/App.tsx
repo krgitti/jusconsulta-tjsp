@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import {
   buscarProcessos,
   buscarDetalhesProcesso,
@@ -12,7 +12,6 @@ import {
 import { ProcessoTJSP } from './types/processo';
 import ProcessoView from './components/ProcessoView';
 import MonitorPanel from './components/MonitorPanel';
-import { setupPushListeners } from './services/monitorService';
 
 type TabBusca = 'numero' | 'nome' | 'documento';
 type FiltroInstancia = 'todas' | string;
@@ -20,8 +19,6 @@ type FiltroInstancia = 'todas' | string;
 function App() {
   const [tabAtiva, setTabAtiva] = useState<TabBusca>('nome');
 
-  // Configurar listeners de push notification (nativo)
-  useEffect(() => { setupPushListeners(); }, []);
   const [termoBusca, setTermoBusca] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
