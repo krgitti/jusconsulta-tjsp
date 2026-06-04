@@ -98,5 +98,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.APK_NAME }}
-          generate_release_notes: true
           name: "JusConsulta TJSP ${{ github.ref_name }}"
+          body: |
+            ## JusConsulta TJSP ${{ github.ref_name }}
+
+            APK oficial assinado — gerado automaticamente via GitHub Actions + Capacitor.
+
+            ### Instalação
+            1. Baixe o arquivo `.apk` abaixo
+            2. No Android: **Configurações → Segurança → Fontes desconhecidas** (habilitar)
+            3. Abra o arquivo `.apk` e instale
+
+            ### Funcionalidades
+            - Busca por nome, CPF/CNPJ e número do processo
+            - Consulta: 1º Grau, 2º Grau e Colégio Recursal
+            - Modo busca rápida e completa
+            - Partes, movimentações, petições e incidentes
+            - Fallback para e-SAJ oficial
