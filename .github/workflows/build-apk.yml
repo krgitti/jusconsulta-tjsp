@@ -26,7 +26,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # ── 3. Java (Android build) ───────────────────────────────────────────────
+      # ── 3. Java 17 ───────────────────────────────────────────────────────────
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -45,58 +45,63 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      # ── 7. Capacitor sync ─────────────────────────────────────────────────────
+      # ── 7. Capacitor add android (gera pasta android/ fresh) ─────────────────
+      - name: Capacitor add android
+        run: npx cap add android
+
+      # ── 8. Capacitor sync ─────────────────────────────────────────────────────
       - name: Capacitor sync Android
         run: npx cap sync android
 
-      # ── 8. Decodificar Keystore do Secret ────────────────────────────────────
+      # ── 9. Decodificar Keystore ───────────────────────────────────────────────
       - name: Decodificar keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
 
-      # ── 9. Configurar assinatura no gradle ───────────────────────────────────
+      # ── 10. Configurar assinatura no build.gradle ─────────────────────────────
       - name: Configurar signing no build.gradle
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cat >> android/app/build.gradle << 'GRADLE'
+          # Injeta bloco de signing no app/build.gradle
+          cat >> app/build.gradle << 'GRADLE'
 
-          android {
-            signingConfigs {
+          android.signingConfigs {
               release {
-                storeFile file("release.keystore")
-                storePassword System.getenv("KEYSTORE_PASSWORD")
-                keyAlias System.getenv("KEY_ALIAS")
-                keyPassword System.getenv("KEY_PASSWORD")
+                  storeFile file("release.keystore")
+                  storePassword System.getenv("KEYSTORE_PASSWORD")
+                  keyAlias System.getenv("KEY_ALIAS")
+                  keyPassword System.getenv("KEY_PASSWORD")
               }
-            }
-            buildTypes {
-              release {
-                signingConfig signingConfigs.release
-              }
-            }
           }
+          android.buildTypes.release.signingConfig = android.signingConfigs.release
           GRADLE
 
-      # ── 10. Build APK release ─────────────────────────────────────────────────
+      # ── 11. Build APK release ─────────────────────────────────────────────────
       - name: Build APK Release
         working-directory: android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # ── 11. Renomear APK com versão ───────────────────────────────────────────
+      # ── 12. Renomear APK ──────────────────────────────────────────────────────
       - name: Renomear APK
         run: |
-          VERSION="${{ github.ref_name }}"
-          if [[ "$VERSION" != v* ]]; then
-            VERSION="dev-$(echo ${{ github.sha }} | head -c 7)"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="dev-$(echo ${{ github.sha }} | cut -c1-7)"
           fi
-          cp android/app/build/outputs/apk/release/app-release.apk \
-             jusconsulta-tjsp-${VERSION}.apk
+          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          cp "$APK_PATH" "jusconsulta-tjsp-${VERSION}.apk"
           echo "APK_NAME=jusconsulta-tjsp-${VERSION}.apk" >> $GITHUB_ENV
 
-      # ── 12. Upload APK como artefato ──────────────────────────────────────────
+      # ── 13. Upload APK como artefato ──────────────────────────────────────────
       - name: Upload APK artefato
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +109,7 @@ jobs:
           path: ${{ env.APK_NAME }}
           retention-days: 30
 
-      # ── 13. Criar Release (só em tags v*) ────────────────────────────────────
+      # ── 14. GitHub Release (apenas em tags v*) ────────────────────────────────
       - name: Criar GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
