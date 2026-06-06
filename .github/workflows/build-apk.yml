@@ -51,16 +51,15 @@ jobs:
       - name: Capacitor sync Android
         run: npx cap sync android
 
-      - name: Substituir ícones Android pelos oficiais do logo
+      - name: Gerar ícones e splash oficiais com @capacitor/assets
         run: |
-          declare -a DENSITIES=("mipmap-mdpi" "mipmap-hdpi" "mipmap-xhdpi" "mipmap-xxhdpi" "mipmap-xxxhdpi")
-          for density in "${DENSITIES[@]}"; do
-            DEST="android/app/src/main/res/${density}"
-            mkdir -p "$DEST"
-            cp "android-icons/${density}/ic_launcher.png"       "${DEST}/ic_launcher.png"
-            cp "android-icons/${density}/ic_launcher_round.png" "${DEST}/ic_launcher_round.png"
-            echo "Ícones copiados: ${density}"
-          done
+          npm install -g @capacitor/assets
+          npx @capacitor/assets generate \
+            --iconBackgroundColor '#0f2d5e' \
+            --iconBackgroundColorDark '#0f2d5e' \
+            --splashBackgroundColor '#0f2d5e' \
+            --splashBackgroundColorDark '#0f2d5e' \
+            --android
 
       - name: Decodificar keystore
         run: |
