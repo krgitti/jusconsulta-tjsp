@@ -51,15 +51,16 @@ jobs:
       - name: Capacitor sync Android
         run: npx cap sync android
 
-      - name: Gerar ícones e splash oficiais com @capacitor/assets
+      - name: Gerar ícones e splash com @capacitor/assets
         run: |
           npm install -g @capacitor/assets
           npx @capacitor/assets generate \
+            --assetPath assets \
+            --androidProject android \
             --iconBackgroundColor '#0f2d5e' \
             --iconBackgroundColorDark '#0f2d5e' \
             --splashBackgroundColor '#0f2d5e' \
-            --splashBackgroundColorDark '#0f2d5e' \
-            --android
+            --splashBackgroundColorDark '#0f2d5e'
 
       - name: Decodificar keystore
         run: |
