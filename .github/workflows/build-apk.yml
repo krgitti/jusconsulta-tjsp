@@ -51,6 +51,17 @@ jobs:
       - name: Capacitor sync Android
         run: npx cap sync android
 
+      - name: Substituir ícones Android pelos oficiais do logo
+        run: |
+          declare -a DENSITIES=("mipmap-mdpi" "mipmap-hdpi" "mipmap-xhdpi" "mipmap-xxhdpi" "mipmap-xxxhdpi")
+          for density in "${DENSITIES[@]}"; do
+            DEST="android/app/src/main/res/${density}"
+            mkdir -p "$DEST"
+            cp "android-icons/${density}/ic_launcher.png"       "${DEST}/ic_launcher.png"
+            cp "android-icons/${density}/ic_launcher_round.png" "${DEST}/ic_launcher_round.png"
+            echo "Ícones copiados: ${density}"
+          done
+
       - name: Decodificar keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
