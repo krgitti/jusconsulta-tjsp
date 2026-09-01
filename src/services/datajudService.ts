@@ -56,23 +56,23 @@ async function postDataJud(body: Record<string, unknown>): Promise<any> {
     Authorization: `APIKey ${DATAJUD_API_KEY}`,
   };
 
-  // Tentativa direta primeiro. Em app Android com CapacitorHttp habilitado
-  // (ver capacitor.config.ts), essa chamada roda fora da WebView e não sofre
-  // bloqueio de CORS — é o caminho preferencial e mais confiável.
+  // Sem CapacitorHttp habilitado, a chamada roda dentro da WebView e o
+  // domínio do CNJ não libera CORS para navegador — vai direto pelo mesmo
+  // proxy usado pelo restante do app para o e-SAJ.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
   try {
-    const resp = await fetch(DATAJUD_ENDPOINT, { method: 'POST', headers, body: payload });
-    if (resp.ok) return resp.json();
-  } catch {
-    // segue para o fallback via proxy
+    const resp = await fetch(DATAJUD_PROXY(DATAJUD_ENDPOINT), {
+      method: 'POST',
+      headers,
+      body: payload,
+      signal: controller.signal,
+    });
+    if (!resp.ok) throw new Error(`DataJud: HTTP ${resp.status}`);
+    return await resp.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const resp = await fetch(DATAJUD_PROXY(DATAJUD_ENDPOINT), {
-    method: 'POST',
-    headers,
-    body: payload,
-  });
-  if (!resp.ok) throw new Error(`DataJud: HTTP ${resp.status}`);
-  return resp.json();
 }
 
 function mapMovimentos(movs?: DataJudMovimento[]): Movimentacao[] {
