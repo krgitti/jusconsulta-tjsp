@@ -19,9 +19,9 @@ const cacheBusca = new Map<string, ResultadoBusca[]>();
 const cacheDetalhes = new Map<string, ProcessoTJSP>();
 
 const CORS_PROXIES = [
-  { name: 'corsproxy.io', fn: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` },
+  { name: 'cors.workers.dev', fn: (url: string) => `https://test.cors.workers.dev/?${url}` },
+  { name: 'cors.lol', fn: (url: string) => `https://api.cors.lol/?url=${encodeURIComponent(url)}` },
   { name: 'allorigins', fn: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
-  { name: 'codetabs', fn: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` },
 ];
 
 let workingProxyIndex = 0;

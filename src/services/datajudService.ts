@@ -18,10 +18,12 @@ const DATAJUD_API_KEY =
 
 const DATAJUD_ENDPOINT = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
 
-// Proxy usado apenas como plano B, caso o ambiente não consiga fazer a
-// chamada nativa (ex.: rodando no navegador em vez do app Android com
-// CapacitorHttp habilitado, que contorna CORS fazendo a chamada fora da WebView).
-const DATAJUD_PROXY = (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+// test.cors.workers.dev (Zibri/cloudflare-cors-anywhere) suporta POST e repasse
+// de headers customizados via "x-cors-headers" — necessário para mandar o
+// Authorization: APIKey exigido pelo DataJud. corsproxy.io fica como plano B
+// (ele ainda libera JSON, só bloqueou HTML por causa de phishing).
+const DATAJUD_PROXY_PRIMARY = (url: string) => `https://test.cors.workers.dev/?${url}`;
+const DATAJUD_PROXY_FALLBACK = (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
 
 export interface DataJudMovimento {
   nome: string;
@@ -56,23 +58,39 @@ async function postDataJud(body: Record<string, unknown>): Promise<any> {
     Authorization: `APIKey ${DATAJUD_API_KEY}`,
   };
 
-  // Sem CapacitorHttp habilitado, a chamada roda dentro da WebView e o
-  // domínio do CNJ não libera CORS para navegador — vai direto pelo mesmo
-  // proxy usado pelo restante do app para o e-SAJ.
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 9000);
-  try {
-    const resp = await fetch(DATAJUD_PROXY(DATAJUD_ENDPOINT), {
-      method: 'POST',
-      headers,
-      body: payload,
-      signal: controller.signal,
-    });
-    if (!resp.ok) throw new Error(`DataJud: HTTP ${resp.status}`);
-    return await resp.json();
-  } finally {
-    clearTimeout(timeoutId);
+  const tentativas = [
+    () =>
+      fetch(DATAJUD_PROXY_PRIMARY(DATAJUD_ENDPOINT), {
+        method: 'POST',
+        headers: { ...headers, 'x-cors-headers': JSON.stringify({ Authorization: headers.Authorization }) },
+        body: payload,
+      }),
+    () =>
+      fetch(DATAJUD_PROXY_FALLBACK(DATAJUD_ENDPOINT), {
+        method: 'POST',
+        headers,
+        body: payload,
+      }),
+  ];
+
+  let ultimoErro: unknown;
+  for (const tentar of tentativas) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    try {
+      const resp = await tentar();
+      clearTimeout(timeoutId);
+      if (!resp.ok) {
+        ultimoErro = new Error(`DataJud: HTTP ${resp.status}`);
+        continue;
+      }
+      return await resp.json();
+    } catch (e) {
+      clearTimeout(timeoutId);
+      ultimoErro = e;
+    }
   }
+  throw ultimoErro instanceof Error ? ultimoErro : new Error('DataJud: falha desconhecida');
 }
 
 function mapMovimentos(movs?: DataJudMovimento[]): Movimentacao[] {
