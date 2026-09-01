@@ -1,4 +1,5 @@
 import { ProcessoTJSP, Parte, Movimentacao, Peticao, Incidente } from '../types/processo';
+import { buscarResultadoDataJud, buscarProcessoDataJud } from './datajudService';
 
 const MAX_RESULTADOS_POR_SISTEMA = 15;
 const REQUEST_TIMEOUT_MS = 9000;
@@ -457,28 +458,40 @@ export async function buscarProcessos(
     sistemas = sistemas.filter((s) => permitidos.has(s.id));
   }
 
-  const resultados = await Promise.allSettled(sistemas.map((s) => buscarEmSistema(s, termo, tipo, modo)));
+  const buscaScraping = Promise.allSettled(sistemas.map((s) => buscarEmSistema(s, termo, tipo, modo)));
+
+  // DataJud (CNJ) roda em paralelo: cobre tanto SAJ quanto eproc, então
+  // funciona mesmo para processos já migrados que o scraping do e-SAJ não
+  // encontra mais.
+  const buscaDataJud: Promise<ResultadoBusca[]> =
+    tipo === 'NUMPROC'
+      ? buscarResultadoDataJud(termo)
+          .then((r) => (r ? [r] : []))
+          .catch(() => [])
+      : Promise.resolve([]);
+
+  const [resultados, resultadosDataJud] = await Promise.all([buscaScraping, buscaDataJud]);
 
   const listas = resultados
     .filter((r): r is PromiseFulfilledResult<ResultadoBusca[]> => r.status === 'fulfilled')
     .map((r) => r.value);
 
-  const houveSucesso = listas.length > 0;
-  const totalResultados = listas.flat().length;
+  const houveSucessoScraping = listas.length > 0;
+  const totalResultadosScraping = listas.flat().length;
 
-  if (!houveSucesso) {
+  if (!houveSucessoScraping && resultadosDataJud.length === 0) {
     const falhas = resultados
       .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
       .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)));
     throw new Error(falhas[0] || 'Falha ao consultar os sistemas disponíveis.');
   }
 
-  if (totalResultados === 0) {
+  if (totalResultadosScraping === 0 && resultadosDataJud.length === 0) {
     cacheBusca.set(cacheKey, []);
     return [];
   }
 
-  const deduplicados = deduplicarResultados(listas.flat());
+  const deduplicados = deduplicarResultados([...resultadosDataJud, ...listas.flat()]);
   cacheBusca.set(cacheKey, deduplicados);
   return deduplicados;
 }
@@ -510,6 +523,13 @@ function deduplicarResultados(lista: ResultadoBusca[]): ResultadoBusca[] {
 export async function buscarDetalhesProcessoPorUrl(url: string): Promise<ProcessoTJSP | null> {
   const cached = cacheDetalhes.get(url);
   if (cached) return cached;
+
+  if (url.startsWith('datajud://')) {
+    const numero = url.replace('datajud://', '');
+    const processo = await buscarProcessoDataJud(numero);
+    if (processo) cacheDetalhes.set(url, processo);
+    return processo;
+  }
 
   const html = await fetchWithProxy(url);
   const parser = new DOMParser();
@@ -545,6 +565,10 @@ export async function buscarDetalhesProcesso(
   sistemaId = 'cpopg',
   urlDireta?: string,
 ): Promise<ProcessoTJSP | null> {
+  if (sistemaId === 'datajud') {
+    return buscarDetalhesProcessoPorUrl(urlDireta || `datajud://${numero.replace(/\D/g, '')}`);
+  }
+
   const sistema = SISTEMAS.find((s) => s.id === sistemaId) || SISTEMAS[0];
   let url = urlDireta || '';
 

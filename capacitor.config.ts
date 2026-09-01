@@ -17,6 +17,11 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     cleartext: false,
   },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;
