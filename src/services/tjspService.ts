@@ -18,10 +18,12 @@ const LIMITES_MODO = {
 const cacheBusca = new Map<string, ResultadoBusca[]>();
 const cacheDetalhes = new Map<string, ProcessoTJSP>();
 
+const MEU_WORKER = (url: string) => `https://jusconsulta-proxy.krgitti80.workers.dev/?url=${encodeURIComponent(url)}`;
+
 const CORS_PROXIES = [
+  { name: 'worker próprio', fn: MEU_WORKER },
   { name: 'cors.workers.dev', fn: (url: string) => `https://test.cors.workers.dev/?${url}` },
   { name: 'cors.lol', fn: (url: string) => `https://api.cors.lol/?url=${encodeURIComponent(url)}` },
-  { name: 'allorigins', fn: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
 ];
 
 let workingProxyIndex = 0;

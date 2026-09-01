@@ -18,12 +18,11 @@ const DATAJUD_API_KEY =
 
 const DATAJUD_ENDPOINT = 'https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search';
 
-// test.cors.workers.dev (Zibri/cloudflare-cors-anywhere) suporta POST e repasse
-// de headers customizados via "x-cors-headers" — necessário para mandar o
-// Authorization: APIKey exigido pelo DataJud. corsproxy.io fica como plano B
-// (ele ainda libera JSON, só bloqueou HTML por causa de phishing).
-const DATAJUD_PROXY_PRIMARY = (url: string) => `https://test.cors.workers.dev/?${url}`;
-const DATAJUD_PROXY_FALLBACK = (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+// Worker próprio (Cloudflare) — não depende de proxy público compartilhado,
+// que degrada/é bloqueado por abuso de terceiros (ver histórico deste arquivo).
+const MEU_WORKER = (url: string) => `https://jusconsulta-proxy.krgitti80.workers.dev/?url=${encodeURIComponent(url)}`;
+const DATAJUD_PROXY_PRIMARY = MEU_WORKER;
+const DATAJUD_PROXY_FALLBACK = (url: string) => `https://test.cors.workers.dev/?${url}`;
 
 export interface DataJudMovimento {
   nome: string;
@@ -62,13 +61,13 @@ async function postDataJud(body: Record<string, unknown>): Promise<any> {
     () =>
       fetch(DATAJUD_PROXY_PRIMARY(DATAJUD_ENDPOINT), {
         method: 'POST',
-        headers: { ...headers, 'x-cors-headers': JSON.stringify({ Authorization: headers.Authorization }) },
+        headers,
         body: payload,
       }),
     () =>
       fetch(DATAJUD_PROXY_FALLBACK(DATAJUD_ENDPOINT), {
         method: 'POST',
-        headers,
+        headers: { ...headers, 'x-cors-headers': JSON.stringify({ Authorization: headers.Authorization }) },
         body: payload,
       }),
   ];
